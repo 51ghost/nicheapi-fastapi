@@ -3,8 +3,14 @@ from supabase import create_client
 import os, hashlib, json
 from datetime import datetime
 
+# Strip /rest/v1/ suffix from SUPABASE_URL if present
+# The supabase client library appends it automatically
+SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
+if SUPABASE_URL.endswith("/rest/v1"):
+    SUPABASE_URL = SUPABASE_URL[:-8]
+
 app = FastAPI(title="NicheAPI Scout", version="2.0.0")
-sb = create_client(os.environ["SUPABASE_URL"],
+sb = create_client(SUPABASE_URL,
                    os.environ["SUPABASE_SERVICE_KEY"])
 INTERNAL_KEY = os.environ.get("INTERNAL_API_KEY", "")
 
