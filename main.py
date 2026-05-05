@@ -53,9 +53,12 @@ async def get_ideas(
 async def get_spec(idea_id: str,
                    x_api_key: str = Header(None)):
     require_auth(x_api_key)
-    r = sb.table("api_ideas")\
-          .select("id,suggested_api_name,openapi_spec")\
-          .eq("id", idea_id).single().execute()
+    try:
+        r = sb.table("api_ideas")\
+              .select("id,suggested_api_name,openapi_spec")\
+              .eq("id", idea_id).single().execute()
+    except Exception:
+        raise HTTPException(404, "Idea not found")
     if not r.data:
         raise HTTPException(404, "Idea not found")
     return {"id": r.data["id"],
@@ -67,9 +70,12 @@ async def get_spec(idea_id: str,
 async def get_stub(idea_id: str,
                    x_api_key: str = Header(None)):
     require_auth(x_api_key)
-    r = sb.table("api_ideas")\
-          .select("id,suggested_api_name,code_stub")\
-          .eq("id", idea_id).single().execute()
+    try:
+        r = sb.table("api_ideas")\
+              .select("id,suggested_api_name,code_stub")\
+              .eq("id", idea_id).single().execute()
+    except Exception:
+        raise HTTPException(404, "Idea not found")
     if not r.data:
         raise HTTPException(404, "Idea not found")
     return {"id": r.data["id"],
