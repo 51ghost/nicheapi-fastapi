@@ -3,19 +3,32 @@ from supabase import create_client
 import os, hashlib, json
 from datetime import datetime
 
-# Strip /rest/v1/ suffix from SUPABASE_URL if present
-# The supabase client library appends it automatically
-SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
-if SUPABASE_URL.endswith("/rest/v1"):
-    SUPABASE_URL = SUPABASE_URL[:-8]
+# Lazily initialized Supabase client
+_sb = None
+_INTERNAL_KEY = ""
+
+def _get_supabase():
+    global _sb
+    if _sb is not None:
+        return _sb
+    # Strip /rest/v1/ suffix from SUPABASE_URL if present
+    # The supabase client library appends it automatically
+    raw_url = os.environ.get("SUPABASE_URL", "")
+    raw_key = os.environ.get("SUPABASE_SERVICE_KEY", "")
+    if not raw_url or not raw_key:
+        return None
+    url = raw_url.rstrip("/")
+    if url.endswith("/rest/v1"):
+        url = url[:-8]
+    _sb = create_client(url, raw_key)
+    return _sb
+
+_INTERNAL_KEY = os.environ.get("INTERNAL_API_KEY", "")
 
 app = FastAPI(title="NicheAPI Scout", version="2.0.0")
-sb = create_client(SUPABASE_URL,
-                   os.environ["SUPABASE_SERVICE_KEY"])
-INTERNAL_KEY = os.environ.get("INTERNAL_API_KEY", "")
 
 def require_auth(x_api_key: str = Header(None)):
-    if x_api_key != INTERNAL_KEY:
+    if x_api_key != _INTERNAL_KEY:
         raise HTTPException(status_code=401,
                             detail="Invalid API key")
 
@@ -30,6 +43,9 @@ async def get_ideas(
     x_api_key: str = Header(None)
 ):
     require_auth(x_api_key)
+    sb = _get_supabase()
+    if not sb:
+        raise HTTPException(503, "Supabase not configured")
     q = sb.table("api_ideas").select(
         "id,suggested_api_name,problem_statement,"
         "niche_category,target_audience,monetization_score,"
@@ -53,6 +69,9 @@ async def get_ideas(
 async def get_spec(idea_id: str,
                    x_api_key: str = Header(None)):
     require_auth(x_api_key)
+    sb = _get_supabase()
+    if not sb:
+        raise HTTPException(503, "Supabase not configured")
     try:
         r = sb.table("api_ideas")\
               .select("id,suggested_api_name,openapi_spec")\
@@ -70,6 +89,9 @@ async def get_spec(idea_id: str,
 async def get_stub(idea_id: str,
                    x_api_key: str = Header(None)):
     require_auth(x_api_key)
+    sb = _get_supabase()
+    if not sb:
+        raise HTTPException(503, "Supabase not configured")
     try:
         r = sb.table("api_ideas")\
               .select("id,suggested_api_name,code_stub")\
@@ -87,6 +109,9 @@ async def get_stub(idea_id: str,
 async def upvote(idea_id: str,
                  x_api_key: str = Header(None)):
     require_auth(x_api_key)
+    sb = _get_supabase()
+    if not sb:
+        raise HTTPException(503, "Supabase not configured")
     r = sb.rpc("increment_upvote",
                {"row_id": idea_id}).execute()
     return {"success": True, "id": idea_id}
